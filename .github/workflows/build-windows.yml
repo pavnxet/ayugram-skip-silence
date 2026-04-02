@@ -1,0 +1,49 @@
+name: Build AyuGram Skip-Silence (Windows)
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:   # Allow manual trigger
+
+jobs:
+  build-windows:
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout code with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup MSVC Environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Prepare third-party libraries (this is the heavy part)
+        shell: cmd
+        run: |
+          cd Telegram
+          call ..\tdesktop\Telegram\build\prepare\win.bat
+          echo "Prepare finished"
+
+      - name: Configure and Build (Release x64)
+        shell: cmd
+        run: |
+          cd Telegram
+          call ..\tdesktop\Telegram\build\configure.bat x64 ^
+            -D TDESKTOP_API_ID=${{ secrets.TDESKTOP_API_ID }} ^
+            -D TDESKTOP_API_HASH=${{ secrets.TDESKTOP_API_HASH }} ^
+            -DCMAKE_BUILD_TYPE=Release
+
+          cmake --build out --config Release --target Telegram --parallel 8
+
+      - name: Upload Windows Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: AyuGram-Skip-Silence-Windows
+          path: |
+            Telegram/out/Release/Telegram.exe
+            Telegram/out/Release/*.pdb
+          retention-days: 14
